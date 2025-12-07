@@ -1713,3 +1713,109 @@ body {
     opacity: 0.7;
     background-color: var(--bg-tertiary);
 }
+/* --- MOBİL UYUMLULUK BAŞLANGICI --- */
+@media (max-width: 768px) {
+    /* 1. Yan Menüyü Gizle */
+    .sidebar {
+        display: none !important;
+    }
+
+    /* 2. Ana İçeriği Genişlet */
+    .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+        padding-bottom: 80px; /* Alt menü için boşluk */
+    }
+
+    /* 3. iPhone Alt Menü Çubuğu (Bottom Navigation) */
+    .mobile-nav {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: #fff;
+        border-top: 1px solid #eee;
+        height: 60px; /* iPhone güvenli alan için artırılabilir */
+        padding-bottom: env(safe-area-inset-bottom);
+        justify-content: space-around;
+        align-items: center;
+        z-index: 1000;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+    }
+
+    .mobile-nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-decoration: none;
+        color: #64748b;
+        font-size: 10px;
+        padding: 5px;
+    }
+
+    .mobile-nav-item.active {
+        color: #6366f1; /* Senin tema rengin */
+    }
+
+    .mobile-nav-item .material-icons {
+        font-size: 24px;
+        margin-bottom: 2px;
+    }
+
+    /* 4. Tabloları Kaydırılabilir Yap (Patlamasın) */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .data-table {
+        min-width: 600px; /* Tablo sıkışmasın, yana kaysın */
+    }
+
+    /* 5. Kartları Mobilde Alt Alta Diz */
+    .stats-grid, .filters-grid, .form-row {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* 6. Modallar Tam Ekran Olsun */
+    .modal-content {
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+        max-height: 100vh !important;
+    }
+}
+
+/* Masaüstünde Alt Menüyü Gizle */
+.mobile-nav {
+    display: none;
+}
+/* --- MOBİL UYUMLULUK BİTİŞİ --- */
+ADIM 2: Alt Menü HTML Kodları
+Şimdi index.html dosyanın </body> (body kapanış) etiketinden hemen önce şu HTML kodunu yapıştır. Bu, telefonlarda ekranın altında çıkacak olan menüdür.
+
+HTML
+
+<nav class="mobile-nav">
+    <a href="#dashboard" class="mobile-nav-item active" onclick="app.navigateTo('dashboard')">
+        <span class="material-icons">dashboard</span>
+        <span>Özet</span>
+    </a>
+    <a href="#payments" class="mobile-nav-item" onclick="app.navigateTo('payments')">
+        <span class="material-icons">payments</span>
+        <span>Ödemeler</span>
+    </a>
+    <a href="#projects" class="mobile-nav-item" onclick="app.navigateTo('projects')">
+        <span class="material-icons">construction</span>
+        <span>Projeler</span>
+    </a>
+    <a href="#materials" class="mobile-nav-item" onclick="app.navigateTo('materials')">
+        <span class="material-icons">inventory_2</span>
+        <span>Malzeme</span>
+    </a>
+    <a href="#settings" class="mobile-nav-item" onclick="app.navigateTo('settings')">
+        <span class="material-icons">settings</span>
+        <span>Ayarlar</span>
+    </a>
+</nav>

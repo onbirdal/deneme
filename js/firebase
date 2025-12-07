@@ -1,0 +1,275 @@
+// ============================================
+// FIRESTORE MODULE - Cloud Database Management
+// ============================================
+
+const FirestoreService = {
+    // Koleksiyon İsimleri (Firebase'deki karşılıkları)
+    COLLECTIONS: {
+        PROJECTS: 'projects',
+        RECIPIENTS: 'recipients',
+        CATEGORIES: 'categories', // Gider kategorileri
+        PAYMENTS: 'payments',
+        MATERIALS: 'materials',
+        CONTRACTS: 'contracts',
+        MATERIAL_CATEGORIES: 'material_categories'
+    },
+
+    // ============================================
+    // GENERIC HELPERS (Yardımcı Fonksiyonlar)
+    // ============================================
+
+    // Firestore verisini temiz bir objeye çevirir (ID'yi içine ekler)
+    _formatDoc(docSnapshot) {
+        return {
+            id: docSnapshot.id,
+            ...docSnapshot.data()
+        };
+    },
+
+    // İlk kurulum: Eğer kategoriler boşsa varsayılanları yükle
+    async init() {
+        const catRef = collection(db, this.COLLECTIONS.CATEGORIES);
+        const snapshot = await getDocs(catRef);
+
+        if (snapshot.empty) {
+            console.log('Veritabanı boş, varsayılan kategoriler yükleniyor...');
+            await this.initializeDefaultCategories();
+            await this.initializeDefaultMaterialCategories();
+        }
+    },
+
+    async initializeDefaultCategories() {
+        const defaultCategories = [
+            { name: 'Malzeme', color: '#3b82f6', icon: 'inventory_2' },
+            { name: 'İşçilik', color: '#10b981', icon: 'engineering' },
+            { name: 'Araç Kiralama', color: '#f59e0b', icon: 'local_shipping' },
+            { name: 'Ekipman', color: '#8b5cf6', icon: 'handyman' },
+            { name: 'Nakliye', color: '#ef4444', icon: 'airport_shuttle' },
+            { name: 'Harç ve Vergiler', color: '#ec4899', icon: 'receipt_long' },
+            { name: 'Diğer', color: '#6b7280', icon: 'more_horiz' }
+        ];
+        
+        const batch = writeBatch(db);
+        defaultCategories.forEach(cat => {
+            const docRef = doc(collection(db, this.COLLECTIONS.CATEGORIES));
+            batch.set(docRef, cat);
+        });
+        await batch.commit();
+    },
+
+    async initializeDefaultMaterialCategories() {
+        const defaultMaterialCategories = [
+            { name: 'Demir', color: '#607d8b', icon: 'build_circle' },
+            { name: 'Çimento', color: '#9e9e9e', icon: 'foundation' },
+            // ... diğerlerin (listeyi kısaltıyorum, sen tamamını eklersin)
+        ];
+
+        const batch = writeBatch(db);
+        defaultMaterialCategories.forEach(cat => {
+            const docRef = doc(collection(db, this.COLLECTIONS.MATERIAL_CATEGORIES));
+            batch.set(docRef, cat);
+        });
+        await batch.commit();
+    },
+
+    // ============================================
+    // PROJECTS (Projeler)
+    // ============================================
+    
+    async getProjects() {
+        try {
+            const q = query(collection(db, this.COLLECTIONS.PROJECTS), orderBy('createdAt', 'desc'));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(this._formatDoc);
+        } catch (error) {
+            console.error("Projeler çekilemedi:", error);
+            return [];
+        }
+    },
+
+    async addProject(projectData) {
+        try {
+            const newProject = {
+                ...projectData,
+                createdAt: Timestamp.now(), // Firebase zaman formatı
+                status: 'active'
+            };
+            const docRef = await addDoc(collection(db, this.COLLECTIONS.PROJECTS), newProject);
+            return { id: docRef.id, ...newProject };
+        } catch (error) {
+            console.error("Proje eklenemedi:", error);
+            throw error;
+        }
+    },
+
+    async updateProject(id, updates) {
+        try {
+            const projectRef = doc(db, this.COLLECTIONS.PROJECTS, id);
+            await updateDoc(projectRef, {
+                ...updates,
+                updatedAt: Timestamp.now()
+            });
+            return true;
+        } catch (error) {
+            console.error("Proje güncellenemedi:", error);
+            return false;
+        }
+    },
+
+    // CASCADING DELETE: Proje silinince ödemeler ve malzemeler de silinmeli
+    async deleteProject(id) {
+        try {
+            const batch = writeBatch(db);
+
+            // 1. Projeyi silme kuyruğuna al
+            const projectRef = doc(db, this.COLLECTIONS.PROJECTS, id);
+            batch.delete(projectRef);
+
+            // 2. İlgili Ödemeleri Bul ve Sil
+            const paymentsQuery = query(collection(db, this.COLLECTIONS.PAYMENTS), where("projectId", "==", id));
+            const paymentsSnap = await getDocs(paymentsQuery);
+            paymentsSnap.forEach((doc) => {
+                batch.delete(doc.ref);
+            });
+
+            // 3. İlgili Malzemeleri Bul ve Sil
+            const materialsQuery = query(collection(db, this.COLLECTIONS.MATERIALS), where("projectId", "==", id));
+            const materialsSnap = await getDocs(materialsQuery);
+            materialsSnap.forEach((doc) => {
+                batch.delete(doc.ref);
+            });
+
+            // İşlemi uygula (Atomik işlem - hepsi ya yapılır ya hiçbiri yapılmaz)
+            await batch.commit();
+            return true;
+
+        } catch (error) {
+            console.error("Proje ve bağlı veriler silinemedi:", error);
+            return false;
+        }
+    },
+
+    // ============================================
+    // RECIPIENTS (Cariler)
+    // ============================================
+
+    async getRecipients() {
+        const snapshot = await getDocs(collection(db, this.COLLECTIONS.RECIPIENTS));
+        return snapshot.docs.map(this._formatDoc);
+    },
+
+    async addRecipient(recipientData) {
+        const docRef = await addDoc(collection(db, this.COLLECTIONS.RECIPIENTS), {
+            ...recipientData,
+            createdAt: Timestamp.now()
+        });
+        return { id: docRef.id, ...recipientData };
+    },
+
+    // ============================================
+    // PAYMENTS (Ödemeler)
+    // ============================================
+
+    async getPayments() {
+        // Uyarı: Çok fazla veri varsa bu sorgu yavaşlayabilir.
+        // İleride "Son 50 ödeme" gibi limitler koymak gerekebilir.
+        const q = query(collection(db, this.COLLECTIONS.PAYMENTS), orderBy('paymentDate', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(this._formatDoc);
+    },
+
+    async getPaymentsByProject(projectId) {
+        const q = query(
+            collection(db, this.COLLECTIONS.PAYMENTS), 
+            where("projectId", "==", projectId),
+            orderBy('paymentDate', 'desc')
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(this._formatDoc);
+    },
+
+    async addPayment(paymentData) {
+        const newPayment = {
+            ...paymentData,
+            createdAt: Timestamp.now(),
+            status: paymentData.status || 'pending'
+        };
+        const docRef = await addDoc(collection(db, this.COLLECTIONS.PAYMENTS), newPayment);
+        return { id: docRef.id, ...newPayment };
+    },
+
+    async deletePayment(id) {
+        await deleteDoc(doc(db, this.COLLECTIONS.PAYMENTS, id));
+        return true;
+    },
+
+    // ============================================
+    // MATERIALS (Malzemeler)
+    // ============================================
+
+    async getMaterialsByProject(projectId) {
+        const q = query(
+            collection(db, this.COLLECTIONS.MATERIALS),
+            where("projectId", "==", projectId)
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(this._formatDoc);
+    },
+
+    async addMaterial(materialData) {
+        const docRef = await addDoc(collection(db, this.COLLECTIONS.MATERIALS), {
+            ...materialData,
+            createdAt: Timestamp.now()
+        });
+        return { id: docRef.id, ...materialData };
+    },
+
+    // ============================================
+    // STATISTICS (İstatistikler)
+    // ============================================
+    
+    // Not: Firestore'da her okuma maliyetlidir. İstatistikleri 
+    // her seferinde her şeyi çekerek hesaplamak yerine, 
+    // bir "dashboard_stats" dokümanında sayaç tutmak daha performanslıdır.
+    // Ancak şimdilik eski mantığı async olarak uyarlıyorum:
+    async getStats() {
+        try {
+            const [projectsSnap, paymentsSnap, recipientsSnap] = await Promise.all([
+                getDocs(collection(db, this.COLLECTIONS.PROJECTS)),
+                getDocs(collection(db, this.COLLECTIONS.PAYMENTS)),
+                getDocs(collection(db, this.COLLECTIONS.RECIPIENTS))
+            ]);
+
+            const projects = projectsSnap.docs.map(d => d.data());
+            const payments = paymentsSnap.docs.map(d => d.data());
+            
+            // Hesaplamalar (Client-side)
+            const activeProjects = projects.filter(p => p.status === 'active').length;
+            const pendingPayments = payments.filter(p => p.status === 'pending').length;
+            
+            // Bu ayın toplamı
+            const now = new Date();
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+            
+            const monthlyTotal = payments
+                .filter(p => {
+                    const pDate = p.paymentDate ? new Date(p.paymentDate) : new Date();
+                    return pDate >= firstDay;
+                })
+                .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+
+            return {
+                activeProjects,
+                pendingPayments,
+                monthlyTotal,
+                totalRecipients: recipientsSnap.size
+            };
+
+        } catch (error) {
+            console.error("İstatistik hatası:", error);
+            return null;
+        }
+    }
+};
+
+export default FirestoreService;

@@ -1,0 +1,1235 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İnşaat Ödemeler Takip</title>
+    <meta name="description" content="İnşaat projeleriniz için kapsamlı Ã¶demeler takip uygulaması">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <!-- Chart.js for Reports -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <span class="material-icons">account_balance</span>
+                <h2>İnşaat Ödemeler</h2>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <span class="material-icons">menu</span>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#dashboard" class="nav-item active" data-page="dashboard">
+                <span class="material-icons">dashboard</span>
+                <span>Ana Sayfa</span>
+            </a>
+            <a href="#payments" class="nav-item" data-page="payments">
+                <span class="material-icons">payments</span>
+                <span>Ödemeler</span>
+                <span class="badge" id="pendingPaymentsBadge"></span>
+            </a>
+            <a href="#materials" class="nav-item" data-page="materials" onclick="UI.loadMaterialsPage()">
+                <span class="material-icons">inventory_2</span>
+                <span>Malzemeler</span>
+            </a>
+            <a href="#recipients" class="nav-item" data-page="recipients">
+                <span class="material-icons">people</span>
+                <span>Firmalar</span>
+            </a>
+            <a href="#projects" class="nav-item" data-page="projects">
+                <span class="material-icons">construction</span>
+                <span>Projeler</span>
+            </a>
+            <a href="#reports" class="nav-item" data-page="reports">
+                <span class="material-icons">assessment</span>
+                <span>Raporlar</span>
+            </a>
+            <a href="#settings" class="nav-item" data-page="settings">
+                <span class="material-icons">settings</span>
+                <span>Ayarlar</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button class="theme-toggle" id="themeToggle">
+                <span class="material-icons">dark_mode</span>
+                <span>Koyu Mod</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Page -->
+        <div class="page active" id="dashboard-page">
+            <div class="page-header">
+                <h1>Ana Sayfa</h1>
+                <p class="page-subtitle">Ödemeler ve proje özeti</p>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <span class="material-icons">payments</span>
+                    </div>
+                    <div class="stat-content">
+                        <p class="stat-label">Bu Ay Toplam Ödeme</p>
+                        <h3 class="stat-value" id="statMonthlyTotal">₺0</h3>
+                        <p class="stat-change positive" id="statMonthlyChange">-</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <span class="material-icons">construction</span>
+                    </div>
+                    <div class="stat-content">
+                        <p class="stat-label">En Yüksek Harcama (Kategori)</p>
+                        <h3 class="stat-value" id="statTopCategory">-</h3>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                        <span class="material-icons">pending_actions</span>
+                    </div>
+                    <div class="stat-content">
+                        <p class="stat-label">En Çok Ödeme Yapılan</p>
+                        <h3 class="stat-value" id="statTopRecipient">-</h3>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">
+                        <span class="material-icons">receipt_long</span>
+                    </div>
+                    <div class="stat-content">
+                        <p class="stat-label">Vadesi Yaklaşan Çek</p>
+                        <h3 class="stat-value" id="statNextCheck">-</h3>
+                        <p class="stat-change" id="statNextCheckDate">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Action Button -->
+            <div class="quick-action-container">
+                <button class="btn-quick-payment" onclick="UI.showPaymentModal()">
+                    <span class="material-icons">add_circle</span>
+                    <span>Yeni Ödeme Ekle</span>
+                </button>
+                <button class="btn-quick-material" onclick="UI.showMaterialModal()">
+                    <span class="material-icons">inventory_2</span>
+                    <span>Malzeme Ekle</span>
+                </button>
+            </div>
+
+            <!-- Recent Payments & Pending Payments -->
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Son Ödemeler</h3>
+                        <button class="btn btn-sm btn-secondary" onclick="app.navigateTo('payments')">
+                            Tümünü Gör
+                        </button>
+                    </div>
+                    <div class="timeline" id="recentPayments">
+                        <!-- Timeline items will be inserted here -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Bekleyen Ödemeler</h3>
+                    </div>
+                    <div class="pending-list" id="pendingPaymentsList">
+                        <!-- Pending payments will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payments Page -->
+        <div class="page" id="payments-page">
+            <div class="page-header">
+                <h1>Ödemeler</h1>
+                <button class="btn btn-primary" onclick="UI.showPaymentModal()">
+                    <span class="material-icons">add</span>
+                    Yeni Ödeme
+                </button>
+            </div>
+
+
+            <!-- Payment Type Tabs -->
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-payment-type="" onclick="UI.setPaymentTypeFilter('')">Tüm
+                    Ödemeler</button>
+                <button class="filter-tab" data-payment-type="cek" onclick="UI.setPaymentTypeFilter('cek')">
+                    <span class="material-icons" style="font-size: 1rem;">receipt_long</span>
+                    Çekler
+                </button>
+            </div>
+
+            <!-- Check Status Tabs (only visible for checks) -->
+            <div class="filter-tabs" id="checkStatusTabs" style="display: none;">
+                <button class="filter-tab active" data-check-status="" onclick="UI.setCheckStatusFilter('')">Tüm
+                    Çekler</button>
+                <button class="filter-tab" data-check-status="pending" onclick="UI.setCheckStatusFilter('pending')">
+                    <span class="material-icons" style="font-size: 1rem;">schedule</span>
+                    Bekleyen
+                </button>
+                <button class="filter-tab" data-check-status="paid" onclick="UI.setCheckStatusFilter('paid')">
+                    <span class="material-icons" style="font-size: 1rem;">check_circle</span>
+                    Tahsil Edilen
+                </button>
+                <button class="filter-tab" data-check-status="overdue" onclick="UI.setCheckStatusFilter('overdue')">
+                    <span class="material-icons" style="font-size: 1rem;">error</span>
+                    Vadesi Geçmiş
+                </button>
+            </div>
+
+            <!-- Filters -->
+            <div class="card filters-card">
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label>Proje</label>
+                        <select id="filterProject" class="form-select">
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Firma</label>
+                        <select id="filterRecipient" class="form-select">
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Kategori</label>
+                        <select id="filterCategory" class="form-select">
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Durum</label>
+                        <select id="filterStatus" class="form-select">
+                            <option value="">Tümü</option>
+                            <option value="paid">Ödendi</option>
+                            <option value="pending">Beklemede</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Ödeme Yöntemi</label>
+                        <select id="filterPaymentMethod" class="form-select">
+                            <option value="">Tümü</option>
+                            <option value="nakit">Nakit</option>
+                            <option value="cek">Çek</option>
+                            <option value="kredi_karti">Kredi Kartı</option>
+                            <option value="havale">Havale</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Başlangıç Tarihi</label>
+                        <input type="date" id="filterStartDate" class="form-input">
+                    </div>
+                    <div class="filter-group">
+                        <label>Bitiş Tarihi</label>
+                        <input type="date" id="filterEndDate" class="form-input">
+                    </div>
+                    <div class="filter-group">
+                        <label>Arama</label>
+                        <input type="text" id="searchPayments" class="form-input" placeholder="Açıklama ara...">
+                    </div>
+                    <div class="filter-group">
+                        <button class="btn btn-secondary" onclick="UI.resetPaymentFilters()">
+                            <span class="material-icons">clear</span>
+                            Temizle
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project Quick Filters -->
+            <div class="project-quick-filters" id="projectQuickFilters">
+                <!-- Project filter buttons will be inserted here -->
+            </div>
+
+            <!-- Payments Table -->
+            <div class="card">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tarih</th>
+                                <th>Proje</th>
+                                <th>Firma</th>
+                                <th>Kategori</th>
+                                <th>Açıklama</th>
+                                <th>Ödeme Yöntemi</th>
+                                <th>Tutar</th>
+                                <th>Durum</th>
+                                <th>İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="paymentsTableBody">
+                            <!-- Payments will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <div class="table-info">
+                        Toplam: <strong id="totalPaymentsDisplay">0</strong> ödeme
+                    </div>
+                    <div class="table-summary">
+                        Toplam Tutar: <strong id="totalAmountDisplay">₺0</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recipients Page -->
+        <div class="page" id="recipients-page">
+            <div class="page-header">
+                <h1>Firmalar</h1>
+                <button class="btn btn-primary" onclick="UI.showRecipientModal()">
+                    <span class="material-icons">add</span>
+                    Yeni Firma
+                </button>
+            </div>
+
+            <!-- Filters -->
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-type="" onclick="UI.filterRecipients('')">Tümü</button>
+                <button class="filter-tab" data-type="taseron"
+                    onclick="UI.filterRecipients('taseron')">Taşeronlar</button>
+                <button class="filter-tab" data-type="tedarikci"
+                    onclick="UI.filterRecipients('tedarikci')">Tedarikçiler</button>
+            </div>
+
+            <!-- Search -->
+            <div class="search-box">
+                <span class="material-icons">search</span>
+                <input type="text" id="searchRecipients" placeholder="Firma ara..." class="form-input">
+            </div>
+
+            <!-- Recipients Grid -->
+            <div class="cards-grid" id="recipientsGrid">
+                <!-- Recipient cards will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Recipient Detail Page -->
+        <div class="page" id="recipient-detail-page">
+            <div class="page-header">
+                <button class="btn btn-secondary" onclick="app.navigateTo('recipients')">
+                    <span class="material-icons">arrow_back</span>
+                    Geri
+                </button>
+                <h1 id="recipientDetailName">-</h1>
+            </div>
+
+            <div class="detail-grid">
+                <div class="card">
+                    <h3>Firma Bilgileri</h3>
+                    <div class="detail-info" id="recipientInfo">
+                        <!-- Info will be inserted here -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Özet</h3>
+                    <div class="summary-stats">
+                        <div class="summary-item">
+                            <span class="material-icons">payments</span>
+                            <div>
+                                <p>Toplam Ödeme</p>
+                                <h3 id="recipientTotalPayments">₺0</h3>
+                            </div>
+                        </div>
+                        <div class="summary-item">
+                            <span class="material-icons">receipt</span>
+                            <div>
+                                <p>Ödeme Sayısı</p>
+                                <h3 id="recipientPaymentCount">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contracts Section -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <div class="card-header">
+                    <h3>Sözleşmeler</h3>
+                    <button class="btn btn-sm btn-primary" onclick="UI.showContractModal()">
+                        <span class="material-icons" style="font-size: 1rem;">add</span>
+                        Sözleşme Ekle
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Proje</th>
+                                <th>Sözleşme</th>
+                                <th>Tarih Aralığı</th>
+                                <th>Tutar</th>
+                                <th>Durum</th>
+                                <th>Belge</th>
+                                <th>İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recipientContractsTable">
+                            <!-- Contracts will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>TÃ¼m Ödemeler</h3>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tarih</th>
+                                <th>Proje</th>
+                                <th>Kategori</th>
+                                <th>Açıklama</th>
+                                <th>Ödeme Yöntemi</th>
+                                <th>Tutar</th>
+                                <th>Durum</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recipientPaymentsTable">
+                            <!-- Payments will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projects Page -->
+        <div class="page" id="projects-page">
+            <div class="page-header">
+                <h1>Projeler</h1>
+                <button class="btn btn-primary" onclick="UI.showProjectModal()">
+                    <span class="material-icons">add</span>
+                    Yeni Proje
+                </button>
+            </div>
+
+            <!-- Filters -->
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-status="" onclick="UI.filterProjects('')">Tümü</button>
+                <button class="filter-tab" data-status="active" onclick="UI.filterProjects('active')">Aktif</button>
+                <button class="filter-tab" data-status="completed"
+                    onclick="UI.filterProjects('completed')">Tamamlanan</button>
+                <button class="filter-tab" data-status="paused"
+                    onclick="UI.filterProjects('paused')">Duraklatılmış</button>
+            </div>
+
+            <!-- Projects Grid -->
+            <div class="cards-grid" id="projectsGrid">
+                <!-- Project cards will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Project Detail Page -->
+        <div class="page" id="project-detail-page">
+            <div class="page-header">
+                <button class="btn btn-secondary" onclick="app.navigateTo('projects')">
+                    <span class="material-icons">arrow_back</span>
+                    Geri
+                </button>
+                <h1 id="projectDetailName">-</h1>
+            </div>
+
+            <div class="project-dashboard-grid">
+                <!-- Info Card -->
+                <div class="card">
+                    <h3>Proje Bilgileri</h3>
+                    <div class="detail-info" id="projectInfo">
+                        <!-- Info will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Main Stats Card -->
+                <div class="card">
+                    <h3>Özet İstatistikler</h3>
+                    <div class="project-stats-summary" id="projectStatsSummary">
+                        <!-- Stats will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="card">
+                    <h3>Kategori Bazlı Harcama</h3>
+                    <div class="chart-container" style="position: relative; height: 250px;">
+                        <canvas id="projectDetailCategoryChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Aylık Harcama Trendi</h3>
+                    <div class="chart-container" style="position: relative; height: 250px;">
+                        <canvas id="projectDetailMonthlyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Proje Ödemeleri</h3>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tarih</th>
+                                <th>Firma</th>
+                                <th>Kategori</th>
+                                <th>Açıklama</th>
+                                <th>Ödeme Yöntemi</th>
+                                <th>Tutar</th>
+                                <th>Durum</th>
+                            </tr>
+                        </thead>
+                        <tbody id="projectPaymentsTable">
+                            <!-- Payments will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Page -->
+        <div class="page" id="materials-page">
+            <div class="page-header">
+                <h1>Malzemeler</h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="Reports.exportToExcel()">
+                        <span class="material-icons">download</span>
+                        Excel
+                    </button>
+                    <button class="btn btn-primary" onclick="UI.showMaterialModal()">
+                        <span class="material-icons">add</span>
+                        Yeni Malzeme
+                    </button>
+                </div>
+            </div>
+
+            <div class="card filters-card">
+                <div class="filters-grid" id="materialFilters">
+                    <div class="filter-group">
+                        <label>Proje</label>
+                        <select id="filterMaterialProject" class="form-select">
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Tedarikçi</label>
+                        <select id="filterMaterialSupplier" class="form-select">
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Kategori</label>
+                        <select id="filterMaterialCategory" class="form-select">
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Başlangıç Tarihi</label>
+                        <input type="date" id="filterMaterialStartDate" class="form-input" />
+                    </div>
+                    <div class="filter-group">
+                        <label>Bitiş Tarihi</label>
+                        <input type="date" id="filterMaterialEndDate" class="form-input" />
+                    </div>
+                    <div class="filter-group">
+                        <label>Ara</label>
+                        <input type="text" id="searchMaterials" class="form-input" placeholder="Malzeme ara..." />
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tarih</th>
+                                <th>Proje</th>
+                                <th>Tedarikçi</th>
+                                <th>Malzeme</th>
+                                <th>Miktar</th>
+                                <th>Birim</th>
+                                <th>Kategori</th>
+                                <th>Notlar</th>
+                                <th>İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="materialsTableBody">
+                            <!-- Materials will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer">
+                    <div class="table-info">
+                        Toplam: <strong id="totalMaterialsDisplay">0</strong> kayıt
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="page" id="reports-page">
+            <div class="page-header">
+                <h1>Raporlar</h1>
+                <button class="btn btn-primary" onclick="Reports.exportToExcel()">
+                    <span class="material-icons">download</span>
+                    Excel'e Aktar
+                </button>
+            </div>
+
+            <!-- Date Range Selector -->
+            <!-- Filters -->
+            <div class="card filters-card">
+                <h3>Rapor Filtreleri</h3>
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label>Proje</label>
+                        <select id="reportFilterProject" class="form-select">
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Firma</label>
+                        <select id="reportFilterRecipient" class="form-select">
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Kategori</label>
+                        <select id="reportFilterCategory" class="form-select">
+                            <option value="">Tümü</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Başlangıç Tarihi</label>
+                        <input type="date" id="reportStartDate" class="form-input">
+                    </div>
+                    <div class="filter-group">
+                        <label>Bitiş Tarihi</label>
+                        <input type="date" id="reportEndDate" class="form-input">
+                    </div>
+                    <div class="filter-group" style="display: flex; align-items: flex-end;">
+                        <button class="btn btn-secondary" onclick="Reports.generateReports()" style="width: 100%;">
+                            <span class="material-icons">refresh</span>
+                            Rapor Oluştur
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report Cards -->
+            <div class="reports-grid">
+                <div class="card">
+                    <h3>Aylık Özet</h3>
+                    <div id="monthlyReport" class="report-content">
+                        <!-- Monthly report will be inserted here -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Kategori Bazlı Dağılım</h3>
+                    <div class="chart-container" style="position: relative; height: 250px; margin-bottom: 2rem;">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                    <div id="categoryReport" class="report-content">
+                        <!-- Category report will be inserted here -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Proje Bazlı Harcama</h3>
+                    <div class="chart-container" style="position: relative; height: 250px; margin-bottom: 2rem;">
+                        <canvas id="projectChart"></canvas>
+                    </div>
+                    <div id="projectReport" class="report-content">
+                        <!-- Project report will be inserted here -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Firma Bazlı Ödemeler</h3>
+                    <div id="recipientReport" class="report-content">
+                        <!-- Recipient report will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Page -->
+        <div class="page" id="settings-page">
+            <div class="page-header">
+                <h1>Ayarlar</h1>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Ödeme Kategorileri</h3>
+                    <button class="btn btn-primary" onclick="UI.showCategoryModal()">
+                        <span class="material-icons">add</span>
+                        Yeni Kategori
+                    </button>
+                </div>
+                <div class="categories-grid" id="categoriesGrid">
+                    <!-- Categories will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Material Categories Management -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Malzeme Kategorileri</h3>
+                    <button class="btn btn-primary" onclick="UI.showMaterialCategoryModal()">
+                        <span class="material-icons">add</span>
+                        Yeni Malzeme Kategorisi
+                    </button>
+                </div>
+                <div class="categories-grid" id="materialCategoriesGrid">
+                    <!-- Material Categories will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Data Management -->
+            <div class="card">
+                <h3>Veri Yönetimi</h3>
+                <div class="settings-actions">
+                    <div class="setting-item">
+                        <div>
+                            <h4>Veriyi Yedekle</h4>
+                            <p>TÃ¼m verileri JSON dosyası olarak indir</p>
+                        </div>
+                        <button class="btn btn-secondary" onclick="Storage.exportData()">
+                            <span class="material-icons">download</span>
+                            Yedekle
+                        </button>
+                    </div>
+                    <div class="setting-item">
+                        <div>
+                            <h4>Veriyi Geri Yükle</h4>
+                            <p>Yedek dosyasından veriyi içe aktar</p>
+                        </div>
+                        <button class="btn btn-secondary" onclick="Storage.importData()">
+                            <span class="material-icons">upload</span>
+                            Geri Yükle
+                        </button>
+                    </div>
+                    <div class="setting-item">
+                        <div>
+                            <h4>TÃ¼m Verileri Sil</h4>
+                            <p class="text-danger">Bu işlem geri alınamaz!</p>
+                        </div>
+                        <button class="btn btn-danger" onclick="Storage.clearAllData()">
+                            <span class="material-icons">delete_forever</span>
+                            Verileri Sil
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Payment Modal -->
+    <div class="modal" id="paymentModal">
+        <div class="modal-overlay" onclick="UI.closeModal('paymentModal')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="paymentModalTitle">Yeni Ödeme</h3>
+                <button class="modal-close" onclick="UI.closeModal('paymentModal')">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <form id="paymentForm" class="modal-body">
+                <input type="hidden" id="paymentId">
+
+                <div class="form-group">
+                    <label for="paymentProject">Proje *</label>
+                    <select id="paymentProject" class="form-select" required>
+                        <option value="">Proje Seçin</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="paymentRecipient">Firma</label>
+                    <div class="input-with-button">
+                        <select id="paymentRecipient" class="form-select">
+                            <option value="">Firma Seçin (Opsiyonel)</option>
+                        </select>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="UI.showRecipientModal(true)">
+                            <span class="material-icons">add</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="paymentCategory">Kategori *</label>
+                    <select id="paymentCategory" class="form-select" required>
+                        <option value="">Kategori Seçin</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="paymentAmount">Tutar (₺) *</label>
+                        <input type="number" id="paymentAmount" class="form-input" step="0.01" min="0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="paymentMethod">Ödeme Yöntemi *</label>
+                        <select id="paymentMethod" class="form-select" required>
+                            <option value="nakit">Nakit</option>
+                            <option value="cek">Çek</option>
+                            <option value="kredi_karti">Kredi Kartı</option>
+                            <option value="havale">Havale</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="paymentDate">Tarih *</label>
+                        <input type="date" id="paymentDate" class="form-input" required>
+                    </div>
+
+                    <div class="form-group" id="dueDateGroup" style="display: none;">
+                        <label for="paymentDueDate">Vade Tarihi *</label>
+                        <input type="date" id="paymentDueDate" class="form-input">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="paymentStatus">Durum *</label>
+                        <select id="paymentStatus" class="form-select" required>
+                            <option value="paid">Ödendi</option>
+                            <option value="pending">Beklemede</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="paymentDescription">Açıklama</label>
+                    <textarea id="paymentDescription" class="form-textarea" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="paymentDocuments">Belgeler/Fotoğraflar</label>
+                    <input type="file" id="paymentDocuments" class="form-input" multiple accept="image/*,.pdf">
+                    <div class="document-previews" id="documentPreviews"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="UI.closeModal('paymentModal')">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Recipient Modal -->
+    <div class="modal" id="recipientModal">
+        <div class="modal-overlay" onclick="UI.closeModal('recipientModal')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="recipientModalTitle">Yeni Firma</h3>
+                <button class="modal-close" onclick="UI.closeModal('recipientModal')">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <form id="recipientForm" class="modal-body">
+                <input type="hidden" id="recipientId">
+
+                <div class="form-group">
+                    <label for="recipientName">İsim/Firma *</label>
+                    <input type="text" id="recipientName" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="recipientType">Tip *</label>
+                    <select id="recipientType" class="form-select" required>
+                        <option value="taseron">Taşeron</option>
+                        <option value="tedarikci">Tedarikçi</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="recipientPhone">Telefon</label>
+                    <input type="tel" id="recipientPhone" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label for="recipientEmail">E-posta</label>
+                    <input type="email" id="recipientEmail" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label for="recipientAddress">Adres</label>
+                    <textarea id="recipientAddress" class="form-textarea" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="recipientIsActive" checked>
+                        <span>Aktif</span>
+                    </label>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="UI.closeModal('recipientModal')">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Contract Modal -->
+    <div class="modal" id="contractModal">
+        <div class="modal-overlay" onclick="UI.closeModal('contractModal')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="contractModalTitle">Yeni Sözleşme</h3>
+                <button class="modal-close" onclick="UI.closeModal('contractModal')">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <form id="contractForm" class="modal-body">
+                <input type="hidden" id="contractId">
+                <input type="hidden" id="contractRecipientId">
+
+                <div class="form-group">
+                    <label for="contractProject">Proje *</label>
+                    <select id="contractProject" class="form-select" required></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="contractName">Sözleşme Adı/Açıklama *</label>
+                    <input type="text" id="contractName" class="form-input" required
+                        placeholder="Örn: Kaba İnşaat Sözleşmesi">
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="isUnitPriceContract" onchange="UI.toggleContractType()">
+                        <span>Birim Fiyatlı Sözleşme</span>
+                    </label>
+                </div>
+
+                <div id="unitPriceItemsContainer"
+                    style="display: none; margin-bottom: 1rem; border: 1px solid var(--border-color); padding: 1rem; border-radius: var(--radius-md);">
+                    <div id="unitItemsList">
+                        <!-- Dynamic items will be added here -->
+                    </div>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="UI.addContractUnitItem()">
+                        <span class="material-icons" style="font-size: 1rem;">add</span>
+                        Kalem Ekle
+                    </button>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contractAmount">Sözleşme Bedeli (₺) *</label>
+                        <input type="number" id="contractAmount" class="form-input" step="0.01" min="0" required>
+                        <small class="form-text" id="contractAmountHelp" style="display: none;">Birim fiyatlardan
+                            otomatik hesaplanır</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contractStatus">Durum *</label>
+                        <select id="contractStatus" class="form-select" required>
+                            <option value="active">Devam Ediyor</option>
+                            <option value="completed">Tamamlandı</option>
+                            <option value="cancelled">İptal Edildi</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contractStartDate">Başlangıç Tarihi *</label>
+                        <input type="date" id="contractStartDate" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="contractEndDate">Bitiş Tarihi *</label>
+                        <input type="date" id="contractEndDate" class="form-input" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="contractNotes">Notlar</label>
+                    <textarea id="contractNotes" class="form-textarea" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="contractDocuments">Sözleşme Dosyası</label>
+                    <input type="file" id="contractDocuments" class="form-input" multiple accept="image/*,.pdf">
+                    <div class="document-previews" id="contractDocumentPreviews"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="UI.closeModal('contractModal')">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Project Modal -->
+    <div class="modal" id="projectModal">
+        <div class="modal-overlay" onclick="UI.closeModal('projectModal')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="projectModalTitle">Yeni Proje</h3>
+                <button class="modal-close" onclick="UI.closeModal('projectModal')">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <form id="projectForm" class="modal-body">
+                <input type="hidden" id="projectId">
+
+                <div class="form-group">
+                    <label for="projectName">Proje Adı *</label>
+                    <input type="text" id="projectName" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="projectLocation">Konum</label>
+                    <input type="text" id="projectLocation" class="form-input">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="projectStartDate">Başlangıç Tarihi *</label>
+                        <input type="date" id="projectStartDate" class="form-input" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="projectStatus">Durum *</label>
+                        <select id="projectStatus" class="form-select" required>
+                            <option value="active">Aktif</option>
+                            <option value="completed">Tamamlanan</option>
+                            <option value="paused">Duraklatılmış</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="projectIsActive" checked>
+                        <span>Aktif</span>
+                    </label>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="UI.closeModal('projectModal')">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div class="modal" id="materialModal">
+        <div class="modal-overlay" onclick="UI.closeModal('materialModal')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="materialModalTitle">Yeni Malzeme</h3>
+                <button class="modal-close" onclick="UI.closeModal('materialModal')">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <form id="materialForm" class="modal-body">
+                <input type="hidden" id="materialId">
+                <div class="form-group">
+                    <label for="materialProject">Proje *</label>
+                    <select id="materialProject" class="form-select" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="materialSupplier">Tedarikçi *</label>
+                    <select id="materialSupplier" class="form-select" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="materialName">Malzeme *</label>
+                    <input type="text" id="materialName" class="form-input" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="materialQuantity">Miktar *</label>
+                        <input type="number" id="materialQuantity" class="form-input" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="materialUnit">Birim *</label>
+                        <select id="materialUnit" class="form-select" required>
+                            <option value="">Seçiniz</option>
+                            <option value="Adet">Adet</option>
+                            <option value="kg">kg</option>
+                            <option value="Ton">Ton</option>
+                            <option value="m">m</option>
+                            <option value="m²">m²</option>
+                            <option value="m³">m³</option>
+                            <option value="Torba">Torba</option>
+                            <option value="Bağ">Bağ</option>
+                            <option value="Koli">Koli</option>
+                            <option value="Paket">Paket</option>
+                            <option value="Litre">Litre</option>
+                            <option value="Takım">Takım</option>
+                            <option value="Saat">Saat</option>
+                            <option value="Gün">Gün</option>
+                            <option value="Sefer">Sefer</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="materialDate">Tarih *</label>
+                    <input type="date" id="materialDate" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label for="materialCategory">Kategori *</label>
+                    <select id="materialCategory" class="form-select" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="materialNotes">Notlar</label>
+                    <textarea id="materialNotes" class="form-textarea" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="materialDocuments">Belgeler/Fotoğraflar</label>
+                    <input type="file" id="materialDocuments" class="form-input" multiple accept="image/*,.pdf">
+                    <div class="document-previews" id="materialDocumentPreviews"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="UI.closeModal('materialModal')">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="categoryModal">
+        <div class="modal-overlay" onclick="UI.closeModal('categoryModal')"></div>
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h3 id="categoryModalTitle">Yeni Kategori</h3>
+                <button class="modal-close" onclick="UI.closeModal('categoryModal')">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <form id="categoryForm" class="modal-body">
+                <input type="hidden" id="categoryId">
+
+                <div class="form-group">
+                    <label for="categoryName">Kategori Adı *</label>
+                    <input type="text" id="categoryName" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="categoryColor">Renk *</label>
+                    <input type="color" id="categoryColor" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="categoryIcon">İkon</label>
+                    <input type="text" id="categoryIcon" class="form-input"
+                        placeholder="home, build, local_shipping...">
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="UI.closeModal('categoryModal')">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Image Lightbox -->
+    <div class="lightbox" id="lightbox">
+        <div class="lightbox-overlay" onclick="UI.closeLightbox()"></div>
+        <button class="lightbox-close" onclick="UI.closeLightbox()">
+            <span class="material-icons">close</span>
+        </button>
+        <img id="lightboxImage" src="" alt="">
+    </div>
+
+    <!-- Material Category Modal -->
+    <div class="modal" id="materialCategoryModal">
+        <div class="modal-overlay" onclick="UI.closeModal('materialCategoryModal')"></div>
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h3 id="materialCategoryModalTitle">Yeni Malzeme Kategorisi</h3>
+                <button class="modal-close" onclick="UI.closeModal('materialCategoryModal')">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <form id="materialCategoryForm" class="modal-body">
+                <input type="hidden" id="materialCategoryId">
+
+                <div class="form-group">
+                    <label for="materialCategoryName">Kategori Adı *</label>
+                    <input type="text" id="materialCategoryName" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="materialCategoryColor">Renk *</label>
+                    <input type="color" id="materialCategoryColor" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="materialCategoryIcon">İkon</label>
+                    <input type="text" id="materialCategoryIcon" class="form-input"
+                        placeholder="inventory_2, build, foundation...">
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="UI.closeModal('materialCategoryModal')">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/check-module.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/reports.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
